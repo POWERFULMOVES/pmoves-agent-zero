@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  agent-zero:
+    build:
+      context: docker/run
+      dockerfile: Dockerfile.custom-cuda
+    ports:
+      - "50001:80"
+    volumes:
+      - ./data:/a0
+    environment:
+      - TZ=UTC
+    restart: unless-stopped

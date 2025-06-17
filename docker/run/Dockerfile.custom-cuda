@@ -1,0 +1,50 @@
+# Use the pre-built Agent Zero image
+FROM frdel/agent-zero-run:v0.8.6
+
+# Add NVIDIA CUDA repository
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gnupg2 \
+    ca-certificates \
+    curl \
+    && mkdir -p /etc/apt/keyrings \
+    && curl -fsSL https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/3bf863cc.pub > /etc/apt/keyrings/cuda-keyring.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/cuda-keyring.gpg] https://developer.download.nvidia.com/compute/cuda/repos/debian12/x86_64/ /" > /etc/apt/sources.list.d/cuda.list
+
+# Install CUDA dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cuda-cudart-dev-12-8 \
+    libcublas-dev-12-8 \
+    libcudnn9-cuda-12 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set CUDA environment variables
+ENV PATH=/usr/local/cuda/bin:${PATH}
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH:-}
+ENV CUDA_HOME=/usr/local/cuda
+ENV CUDA_VERSION=12.8.1
+
+# Install Python and pip
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create and set up the virtual environment for PyTorch with CUDA support
+ARG INSTRUMENTS_VENV_PATH="/a0/instruments_venv"
+RUN python3 -m pip install --user --break-system-packages virtualenv && \
+    python3 -m virtualenv $INSTRUMENTS_VENV_PATH && \
+    . $INSTRUMENTS_VENV_PATH/bin/activate && \
+    echo "=== Upgrading pip, setuptools, wheel ===" && \
+    pip install --upgrade pip setuptools wheel && \
+    echo "=== Installing PyTorch with CUDA ===" && \
+    pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# Expose ports
+EXPOSE 80
+
+# Set working directory
+WORKDIR /a0
+
+# Start Agent Zero
+CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
